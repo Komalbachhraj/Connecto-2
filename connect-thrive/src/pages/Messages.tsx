@@ -90,7 +90,18 @@ const Messages = () => {
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedChatId) return;
     const success = await sendMessage(selectedChatId, newMessage);
-    if (success) setNewMessage("");
+  
+      if (success) {
+    // 2. REAL-TIME ke liye Socket emit karna zaruri hai 👈 YE ADD KARO
+    socket.emit("send_direct_message", {
+      senderId: currentUserId,
+      receiverId: selectedChatId,
+      text: newMessage,
+    });
+
+    setNewMessage("");
+  }
+    
   };
 
   return (
