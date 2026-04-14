@@ -15,16 +15,40 @@ import NotFound from "./pages/NotFound";
 import ConnectionRequests from "./pages/ConnectionRequests";
 import ProtectedRoute from "./components/ProtectedRoute";
 import FindYourMatch from  "./pages/FindYourMatch";
+import OnboardingFlow from "./components/onboarding/OnboardingFlow";
+// import IdeaHub from "./pages/startup/IdeaHub";
+import IdeaDetail from "./pages/startup/IdeaDetail";
+import PostIdea from "./pages/startup/PostIdea";
+import MentorConnect from "./pages/startup/MentorConnect";
+import MentorProfile from "./pages/startup/MentorProfile";
+import Funding from "./pages/startup/Funding";
+import IdeaHub from "./pages/startup/IdeaHub";
 
 
 const queryClient = new QueryClient();
+
+function OnboardingGuard({ children }: { children: React.ReactNode }) {
+  const token        = localStorage.getItem("token");
+  const onboardingDone = localStorage.getItem("onboardingDone") === "true";
+
+  // No token means ProtectedRoute already redirects to /login,
+  // but we guard here too just in case.
+  if (!token) return <Navigate to="/login" replace />;
+
+  // Logged in but onboarding not done → send them to fill interests
+  if (!onboardingDone) return <Navigate to="/onboarding" replace />;
+
+  return <>{children}</>;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter future={{v7_startTransition:true,
+        v7_relativeSplatPath:true,
+      }}>
         <Routes>
           {/* Protected Routes: Sirf login ke baad dikhenge */}
           <Route
@@ -84,6 +108,13 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+          <Route path="/startup/idea/:id" element={<IdeaDetail />} />
+          <Route path="/startup/post-idea" element={<PostIdea />} />
+          <Route path="/startup/mentors" element={<MentorConnect />} />
+          <Route path="/startup/ideas" element={<IdeaHub />} />
+          <Route path="/startup/mentor/:id" element={<MentorProfile />} />
+          <Route path="/startup/funding" element={<Funding />} />
+          <Route path="/onboarding" element={<ProtectedRoute><OnboardingFlow /></ProtectedRoute>} />
 
           {/* Public Routes: Har koi dekh sakta hai */}
           <Route path="/login" element={<Login />} />

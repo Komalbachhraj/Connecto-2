@@ -30,10 +30,21 @@ const Login = () => {
         },
       );
 
-      // 2. Agar success hota hai toh Token save karna
-      const { token } = response.data;
-      localStorage.setItem("token", token);
-      localStorage.setItem("username", response.data.user.username);
+      const { token, user } = response.data;
+
+// Token save
+localStorage.setItem("token", token);
+
+// Username save (optional)
+localStorage.setItem("username", user.username);
+
+// ⭐ MOST IMPORTANT — user object save
+localStorage.setItem(
+  "user",
+  JSON.stringify(user)
+);
+
+console.log("Saved User:", user);
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",

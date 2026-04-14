@@ -11,7 +11,6 @@ import {
   User,
   MapPin,
   Mail,
-  Phone,
   Edit3,
   Camera,
   Plane,
@@ -27,10 +26,46 @@ import axios from "axios";
 import { useState, useEffect } from "react";
 import FindMatchButton from "../components/FindMatch/FindMatchButton";
 
-const Profile = () => {
+const API = "https://connecto-2.onrender.com/api/users";
+
+const COMMUNITY_DISPLAY: Record<
+  string,
+  {
+    icon: React.ElementType;
+    color: string;
+    bgColor: string;
+  }
+> = {
+  travel: { icon: Plane, color: "text-travel", bgColor: "bg-travel/10" },
+  dsa: { icon: Code, color: "text-dsa", bgColor: "bg-dsa/10" },
+  "mental-wellness": {
+    icon: Brain,
+    color: "text-wellness",
+    bgColor: "bg-wellness/10",
+  },
+  startup: { icon: Rocket, color: "text-startup", bgColor: "bg-startup/10" },
+  gym: { icon: Dumbbell, color: "text-gym", bgColor: "bg-gym/10" },
+};
+
+// ── Read cached onboarding data from localStorage ──────────────
+// Saved by OnboardingFlow.jsx after the user completes onboarding.
+// This lets Profile show year/dept/interests instantly without
+// waiting for an API round-trip.
+function getOnboardingCache() {
+  try {
+    const raw = localStorage.getItem("onboardingProfile");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function Profile() {
   const { toast } = useToast();
-  const [isEditing, setIsEditing] = useState(false);
   const navigate = useNavigate();
+  const [isEditing, setIsEditing] = useState(false);
+
+  // ── Profile state ──────────────────────────────────────────
   const [profile, setProfile] = useState({
     name: "",
     email: "",
@@ -39,50 +74,110 @@ const Profile = () => {
     bio: "",
   });
   const [tempProfile, setTempProfile] = useState(profile);
-  // --- 1. Fetch Profile Data on Load ---
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await axios.get(
-          "https://connecto-2.onrender.com/api/users/profile",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
 
-        // Backend data ko state ke sath merge karein aur default values dein
-        const userData = {
-          name: res.data.username || "User",
-          email: res.data.email || "",
-          phone: res.data.phone || "",
-          hometown: res.data.hometown || "",
-          bio: res.data.bio || "",
+  // ── Interest data (from onboarding cache + API) ────────────
+  const cache = getOnboardingCache();
+  const [year, setYear] = useState(cache?.year || "");
+  const [dept, setDept] = useState(cache?.dept || "");
+  const [fieldPrefs, setFieldPrefs] = useState<string[]>(
+    cache?.fieldPref || [],
+  );
+  const [sports, setSports] = useState<string[]>(cache?.sports || []);
+  const [hobbies, setHobbies] = useState<string[]>(cache?.hobbies || []);
+  const [foodPrefs, setFoodPrefs] = useState<string[]>(cache?.food || []);
+  const [travelPrefs, setTravelPrefs] = useState<string[]>(
+    cache?.placePref || [],
+  );
+
+  // ── Dynamic data ───────────────────────────────────────────
+  const [communities, setCommunities] = useState<any[]>([]);
+  const [activity, setActivity] = useState({
+    posts: 0,
+    connections: 0,
+    messages: 0,
+  });
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadingCommunities, setLoadingCommunities] = useState(true);
+  const [loadingActivity, setLoadingActivity] = useState(true);
+
+  const token = localStorage.getItem("token");
+  const headers = { Authorization: `Bearer ${token}` };
+
+  // ── Fetch all profile data ─────────────────────────────────
+  useEffect(() => {
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    // 1. Basic profile
+    axios
+      .get(`${API}/profile`, { headers })
+      .then((res) => {
+        const p = res.data;
+        const profileData = {
+          name: p.username || p.name || "User",
+          email: p.email || "",
+          phone: p.phone || "",
+          hometown: p.hometown || "",
+          bio: p.bio || "",
+        };
+        setProfile(profileData);
+        setTempProfile(profileData);
+
+        // ── Update interest fields from API ────────────────────
+        // Always overwrite with real DB values (even empty arrays)
+        // so the UI stays in sync with what's actually stored.
+        const safeArr = (val: any): string[] => {
+          if (Array.isArray(val)) return val;
+          try {
+            return val ? JSON.parse(val) : [];
+          } catch {
+            return [];
+          }
         };
 
-        setProfile(userData);
-        setTempProfile(userData);
-      } catch (err) {
-        console.error("Failed to fetch profile", err);
-      }
-    };
-    fetchProfile();
+        if (p.year !== undefined && p.year !== null) setYear(p.year);
+        if (p.dept !== undefined && p.dept !== null) setDept(p.dept);
+        setFieldPrefs(safeArr(p.field_prefs));
+        setSports(safeArr(p.sports));
+        setHobbies(safeArr(p.hobbies));
+        setFoodPrefs(safeArr(p.food_prefs));
+        setTravelPrefs(safeArr(p.place_prefs));
+      })
+      .catch((err) => {
+        console.error("Profile fetch error:", err);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not load profile data",
+        });
+      })
+      .finally(() => setLoadingProfile(false));
+
+    // 2. Communities
+    axios
+      .get(`${API}/communities`, { headers })
+      .then((res) => setCommunities(res.data))
+      .catch((err) => console.warn("Communities fetch:", err))
+      .finally(() => setLoadingCommunities(false));
+
+    // 3. Activity stats
+    axios
+      .get(`${API}/activity`, { headers })
+      .then((res) => setActivity(res.data))
+      .catch((err) => console.warn("Activity fetch:", err))
+      .finally(() => setLoadingActivity(false));
   }, []);
 
-  // --- 2. Save Data to Backend ---
+  // ── Save profile edits ─────────────────────────────────────
   const handleSave = async () => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.put(
-        "https://connecto-2.onrender.com/api/users/profile/update",
-        tempProfile, // Buffer data bhejein
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      setProfile(tempProfile); // Sirf success par main state update karein
+      await axios.put(`${API}/profile/update`, tempProfile, { headers });
+      setProfile(tempProfile);
       setIsEditing(false);
       toast({ title: "Success", description: "Profile updated!" });
-    } catch (err) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Error",
@@ -92,127 +187,125 @@ const Profile = () => {
   };
 
   const handleCancel = () => {
-    setTempProfile(profile); // Changes discard karke wapas original data set karein
+    setTempProfile(profile);
     setIsEditing(false);
   };
+
   const handleLogout = () => {
-    // 1. Token hatao
     localStorage.removeItem("token");
 
-    // 2. Success message (Optional)
+    localStorage.removeItem("onboardingProfile");
     toast({
       title: "Logged Out",
       description: "You have been successfully logged out.",
     });
-
-    // 3. Page ko redirect karo (Navigate use karke ya window reload se)
-    // Sabse aasan tarika window.location hai taki state fresh ho jaye
-    window.location.href = "/";
+    navigate("/login");
   };
-  const communities = [
-    {
-      id: "travel",
-      name: "Travel",
-      icon: Plane,
-      color: "text-travel",
-      bgColor: "bg-travel/10",
-    },
-    {
-      id: "dsa",
-      name: "DSA",
-      icon: Code,
-      color: "text-dsa",
-      bgColor: "bg-dsa/10",
-    },
-    {
-      id: "mental-wellness",
-      name: "Wellness",
-      icon: Brain,
-      color: "text-wellness",
-      bgColor: "bg-wellness/10",
-    },
-    {
-      id: "startup",
-      name: "Startup",
-      icon: Rocket,
-      color: "text-startup",
-      bgColor: "bg-startup/10",
-    },
-    {
-      id: "gym",
-      name: "Gym",
-      icon: Dumbbell,
-      color: "text-gym",
-      bgColor: "bg-gym/10",
-    },
-  ];
 
-  // const Profile = () => {
-  //   const [isEditing, setIsEditing] = useState(false);
-  //   const [profile, setProfile] = useState({
-  //     name: "Ananya Sharma",
-  //     email: "ananya@nit.edu",
-  //     phone: "+91 98765 43210",
-  //     hometown: "Gurgaon",
-  //     bio: "Computer Science student passionate about building products that make a difference. Love traveling, coding, and staying fit!",
-  //     interests: ["Travel", "DSA", "Startup"],
-  //   });
+  // ── Interest tag section helper ────────────────────────────
+  function InterestSection({
+    title,
+    items,
+    colorClass,
+  }: {
+    title: string;
+    items: string[];
+    colorClass: string;
+  }) {
+    if (!items.length) return null;
+    return (
+      <div className="mb-4">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+          {title}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {items.map((item) => (
+            <span
+              key={item}
+              className={`text-xs px-3 py-1.5 rounded-full border font-medium ${colorClass}`}
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-
       <main className="pt-24 pb-12">
         <div className="container mx-auto px-4 max-w-4xl">
-          {/* Profile Header */}
+          {/* ── Profile Header ── */}
           <motion.div
             className="glass-card p-8 mb-8 relative overflow-hidden"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            {/* Background gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
-
             <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
-              {/* Avatar */}
               <div className="relative">
                 <motion.div
                   className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-4xl font-display font-bold text-primary-foreground"
                   whileHover={{ scale: 1.05 }}
                 >
-                  {profile.name.charAt(0)}
+                  {loadingProfile
+                    ? "…"
+                    : profile.name.charAt(0).toUpperCase() || "?"}
                 </motion.div>
                 <button className="absolute bottom-0 right-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/80 transition-colors">
                   <Camera className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Info */}
               <div className="flex-1 text-center md:text-left">
-                <h1 className="text-3xl font-display font-bold mb-2">
-                  {profile.name}
-                </h1>
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-muted-foreground mb-4">
+                {loadingProfile ? (
+                  <div className="h-8 w-40 bg-muted/40 rounded-lg animate-pulse mb-2" />
+                ) : (
+                  <h1 className="text-3xl font-display font-bold mb-2">
+                    {profile.name}
+                  </h1>
+                )}
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-muted-foreground mb-2">
                   <span className="flex items-center gap-1">
                     <Mail className="w-4 h-4" />
-                    {profile.email}
+                    {loadingProfile ? "…" : profile.email}
                   </span>
                   <span className="flex items-center gap-1">
                     <MapPin className="w-4 h-4 text-primary" />
-                    {profile.hometown}
+                    {loadingProfile ? "…" : profile.hometown || "—"}
                   </span>
                 </div>
-                <p className="text-muted-foreground">{profile.bio}</p>
+
+                {/* Year + dept badges — shown instantly from cache */}
+                {(year || dept) && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {year && (
+                      <span className="text-xs px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary font-medium">
+                        {year}
+                      </span>
+                    )}
+                    {dept && (
+                      <span className="text-xs px-3 py-1 rounded-full bg-secondary/15 border border-secondary/30 text-secondary font-medium">
+                        {dept}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-muted-foreground">
+                  {loadingProfile ? "Loading…" : profile.bio || "No bio yet."}
+                </p>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => {
-                    setTempProfile(profile); // Purana data copy karein
+                    setTempProfile(profile);
                     setIsEditing(true);
                   }}
                 >
@@ -226,7 +319,7 @@ const Profile = () => {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Left Column - Edit Form or Stats */}
+            {/* ── Left column ── */}
             <motion.div
               className="md:col-span-2 space-y-6"
               initial={{ opacity: 0, x: -20 }}
@@ -258,13 +351,13 @@ const Profile = () => {
                         <Input
                           id="hometown"
                           value={tempProfile.hometown}
+                          placeholder="e.g., Panipat"
                           onChange={(e) =>
                             setTempProfile({
                               ...tempProfile,
                               hometown: e.target.value,
                             })
                           }
-                          placeholder="e.g., Gurgaon, Delhi"
                         />
                       </div>
                     </div>
@@ -286,6 +379,7 @@ const Profile = () => {
                       <Textarea
                         id="bio"
                         value={tempProfile.bio}
+                        rows={4}
                         placeholder="Tell us more about yourself!"
                         onChange={(e) =>
                           setTempProfile({
@@ -293,17 +387,13 @@ const Profile = () => {
                             bio: e.target.value,
                           })
                         }
-                        rows={4}
                       />
                     </div>
                     <div className="flex gap-4">
                       <Button onClick={handleSave} className="btn-glow">
                         Save Changes
                       </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsEditing(false)}
-                      >
+                      <Button variant="outline" onClick={handleCancel}>
                         Cancel
                       </Button>
                     </div>
@@ -311,74 +401,197 @@ const Profile = () => {
                 </div>
               ) : (
                 <>
-                  {/* My Communities */}
+                  {/* ── My Communities ── */}
                   <div className="glass-card p-6">
                     <h2 className="text-xl font-display font-semibold mb-4">
                       My Communities
                     </h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      {communities.map((community, index) => (
-                        <motion.a
-                          key={community.id}
-                          href={`/community/${community.id}`}
-                          className={`glass-card p-4 flex flex-col items-center gap-2 hover:border-primary/50 transition-colors`}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                          whileHover={{ scale: 1.05 }}
-                        >
+                    {loadingCommunities ? (
+                      <div className="grid grid-cols-3 gap-4">
+                        {[1, 2, 3].map((i) => (
                           <div
-                            className={`w-12 h-12 rounded-lg ${community.bgColor} flex items-center justify-center`}
-                          >
-                            <community.icon
-                              className={`w-6 h-6 ${community.color}`}
-                            />
-                          </div>
-                          <span className="text-sm font-medium">
-                            {community.name}
-                          </span>
-                        </motion.a>
-                      ))}
-                    </div>
+                            key={i}
+                            className="h-24 rounded-xl bg-muted/30 animate-pulse"
+                          />
+                        ))}
+                      </div>
+                    ) : communities.length === 0 ? (
+                      <p className="text-muted-foreground text-sm">
+                        You haven't joined any communities yet.{" "}
+                        <a
+                          href="/communities"
+                          className="text-primary underline"
+                        >
+                          Browse communities
+                        </a>
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {communities.map((community, index) => {
+                          const display = COMMUNITY_DISPLAY[community.slug] ?? {
+                            icon: User,
+                            color: "text-primary",
+                            bgColor: "bg-primary/10",
+                          };
+                          const Icon = display.icon;
+                          return (
+                            <motion.a
+                              key={community.id}
+                              href={`/community/${community.slug}`}
+                              className="glass-card p-4 flex flex-col items-center gap-2 hover:border-primary/50 transition-colors"
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.1 }}
+                              whileHover={{ scale: 1.05 }}
+                            >
+                              <div
+                                className={`w-12 h-12 rounded-lg ${display.bgColor} flex items-center justify-center`}
+                              >
+                                <Icon className={`w-6 h-6 ${display.color}`} />
+                              </div>
+                              <span className="text-sm font-medium">
+                                {community.name}
+                              </span>
+                            </motion.a>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Activity Stats */}
+                  {/* ── Interest Profile ── always visible ── */}
+                  <div className="glass-card p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-display font-semibold">
+                        Interest Profile
+                      </h2>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate("/onboarding")}
+                      >
+                        {fieldPrefs.length > 0 ||
+                        sports.length > 0 ||
+                        hobbies.length > 0 ||
+                        foodPrefs.length > 0 ||
+                        travelPrefs.length > 0
+                          ? "Update Interests"
+                          : "Add Interests"}
+                      </Button>
+                    </div>
+
+                    {/* Empty state */}
+                    {!loadingProfile &&
+                    fieldPrefs.length === 0 &&
+                    sports.length === 0 &&
+                    hobbies.length === 0 &&
+                    foodPrefs.length === 0 &&
+                    travelPrefs.length === 0 ? (
+                      <div className="text-center py-6">
+                        <div className="text-4xl mb-3">🎯</div>
+                        <p className="text-sm font-medium text-foreground mb-1">
+                          No interests added yet
+                        </p>
+                        <p className="text-xs text-muted-foreground mb-4">
+                          Add your interests to get better matches and let
+                          others know what you're into.
+                        </p>
+                        <Button
+                          className="btn-glow"
+                          size="sm"
+                          onClick={() => navigate("/onboarding")}
+                        >
+                          Add Your Interests
+                        </Button>
+                      </div>
+                    ) : loadingProfile ? (
+                      <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                          <div
+                            key={i}
+                            className="h-8 bg-muted/30 rounded-lg animate-pulse"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        <InterestSection
+                          title="Fields & Career"
+                          items={fieldPrefs}
+                          colorClass="bg-primary/10 text-primary border-primary/25"
+                        />
+                        <InterestSection
+                          title="Sports & Fitness"
+                          items={sports}
+                          colorClass="bg-orange-500/10 text-orange-400 border-orange-500/25"
+                        />
+                        <InterestSection
+                          title="Hobbies"
+                          items={hobbies}
+                          colorClass="bg-secondary/10 text-secondary border-secondary/25"
+                        />
+                        <InterestSection
+                          title="Food"
+                          items={foodPrefs}
+                          colorClass="bg-pink-500/10 text-pink-400 border-pink-500/25"
+                        />
+                        <InterestSection
+                          title="Travel"
+                          items={travelPrefs}
+                          colorClass="bg-green-500/10 text-green-400 border-green-500/25"
+                        />
+                      </>
+                    )}
+                  </div>
+
+                  {/* ── Activity Stats ── */}
                   <div className="glass-card p-6">
                     <h2 className="text-xl font-display font-semibold mb-4">
                       Activity
                     </h2>
-                    <div className="grid grid-cols-3 gap-4">
-                      {[
-                        { label: "Posts", value: "24" },
-                        { label: "Connections", value: "156" },
-                        { label: "Messages", value: "89" },
-                      ].map((stat) => (
-                        <div
-                          key={stat.label}
-                          className="text-center p-4 bg-muted/30 rounded-lg"
-                        >
-                          <div className="text-2xl font-display font-bold gradient-text">
-                            {stat.value}
+                    {loadingActivity ? (
+                      <div className="grid grid-cols-3 gap-4">
+                        {[1, 2, 3].map((i) => (
+                          <div
+                            key={i}
+                            className="h-20 rounded-xl bg-muted/30 animate-pulse"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-4">
+                        {[
+                          { label: "Posts", value: activity.posts },
+                          { label: "Connections", value: activity.connections },
+                          { label: "Messages", value: activity.messages },
+                        ].map((stat) => (
+                          <div
+                            key={stat.label}
+                            className="text-center p-4 bg-muted/30 rounded-xl"
+                          >
+                            <div className="text-2xl font-display font-bold gradient-text">
+                              {stat.value ?? 0}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {stat.label}
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {stat.label}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
             </motion.div>
 
-            {/* Right Column - Quick Actions */}
+            {/* ── Right column ── */}
             <motion.div
               className="space-y-6"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
-              {/* Hometown Badge */}
+              {/* Hometown */}
               <div className="glass-card p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -387,15 +600,20 @@ const Profile = () => {
                   <div>
                     <h3 className="font-medium">Hometown</h3>
                     <p className="text-primary font-semibold">
-                      {profile.hometown}
+                      {loadingProfile ? "…" : profile.hometown || "Not set"}
                     </p>
                   </div>
                 </div>
-                <Button variant="outline" className="w-full" asChild>
-                  <a href="/find-buddies">Find Hometown Buddies</a>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => navigate("/hometown-buddies")}
+                >
+                  Find Hometown Buddies
                 </Button>
               </div>
-              {/* Find Your Match */}
+
+              {/* Find your match */}
               <div className="glass-card p-6">
                 <h3 className="font-display font-semibold mb-2">
                   Find Your People
@@ -413,24 +631,23 @@ const Profile = () => {
                   <Button
                     variant="ghost"
                     className="w-full justify-start"
-                    asChild
+                    onClick={() => navigate("/messages")}
                   >
-                    <a href="/messages">
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      Messages
-                    </a>
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start">
-                    <User className="w-4 h-4 mr-2" />
-                    My Posts
+                    <MessageCircle className="w-4 h-4 mr-2" /> Messages
                   </Button>
                   <Button
                     variant="ghost"
-                    className="w-full justify-start text-destructive hover:text-destructive"
+                    className="w-full justify-start"
+                    onClick={() => navigate("/")}
+                  >
+                    <User className="w-4 h-4 mr-2" /> My Posts
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={handleLogout}
                   >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
+                    <LogOut className="w-4 h-4 mr-2" /> Logout
                   </Button>
                 </div>
               </div>
@@ -438,10 +655,9 @@ const Profile = () => {
           </div>
         </div>
       </main>
-
       <Footer />
     </div>
   );
-};
+}
 
 export default Profile;

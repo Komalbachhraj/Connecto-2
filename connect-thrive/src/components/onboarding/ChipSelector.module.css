@@ -1,0 +1,67 @@
+/* ChipSelector.module.css */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.chip {
+  padding: 8px 16px;
+  border-radius: 99px;
+  border: 1px solid #2a3244;
+  background: #1c2230;
+  color: #8b949e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.18s, color 0.18s, background 0.18s;
+  font-family: inherit;
+}
+
+.chip:hover:not(.disabled) {
+  border-color: #00bcd4;
+  color: #e6edf3;
+}
+
+/* ── accent variants ── */
+.accentCyan {
+  border-color: #00e5ff;
+  background: rgba(0, 229, 255, 0.1);
+  color: #00e5ff;
+  box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.2);
+}
+
+.accentGreen {
+  border-color: #39d353;
+  background: rgba(57, 211, 83, 0.1);
+  color: #39d353;
+  box-shadow: 0 0 0 1px rgba(57, 211, 83, 0.2);
+}
+
+.accentOrange {
+  border-color: #ff9800;
+  background: rgba(255, 152, 0, 0.1);
+  color: #ff9800;
+  box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.2);
+}
+
+.accentPurple {
+  border-color: #a78bfa;
+  background: rgba(167, 139, 250, 0.1);
+  color: #a78bfa;
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.2);
+}
+
+.accentPink {
+  border-color: #f472b6;
+  background: rgba(244, 114, 182, 0.1);
+  color: #f472b6;
+  box-shadow: 0 0 0 1px rgba(244, 114, 182, 0.2);
+}
+
+.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

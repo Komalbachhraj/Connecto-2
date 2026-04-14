@@ -71,7 +71,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // API success hone ke baad, hum manually local state update karenge
         // Taki baar-baar fetchMessages na chalana pade (Optimistic Update)
         const newMsg = await res.json();
-        get().addMessage(newMsg);
+        // get().addMessage(newMsg);
         return true;
       }
       return false;

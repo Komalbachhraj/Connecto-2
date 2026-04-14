@@ -51,6 +51,7 @@ const Navbar = () => {
     { path: "/communities", icon: Users, label: "Communities" },
     { path: "/messages", icon: MessageCircle, label: "Messages" },
     { path: "/find-buddies", icon: Search, label: "Find Buddies" },
+    { path: "/profile", icon: User, label: "Profile" },
   ];
 
   return (

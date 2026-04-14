@@ -1,117 +1,218 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CommunityCard from "@/components/CommunityCard";
+
 import { Plane, Code, Brain, Rocket, Dumbbell, Search } from "lucide-react";
+
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
+import axios from "axios";
+
+//////////////////////////////////////////////////////
+// DEFAULT COMMUNITIES (STATIC UI)
+//////////////////////////////////////////////////////
 
 const allCommunities = [
   {
-    id: "travel",
+    id: 1,
+    slug: "travel",
     name: "Travel & Explore",
-    description: "Discover nearby campus places, cafes, weekend getaways, and find travel buddies. Share your adventures and plan trips together!",
+    description:
+      "Discover nearby campus places, cafes, weekend getaways, and find travel buddies.",
     icon: Plane,
-    members: 234,
     color: "text-travel",
     gradient: "bg-gradient-to-br from-cyan-500 to-blue-600",
   },
   {
-    id: "dsa",
+    id: 2,
+    slug: "dsa",
     name: "DSA & Coding",
-    description: "Master Data Structures & Algorithms together. Share resources, solve problems, participate in coding contests, and crack placements!",
+    description:
+      "Master Data Structures & Algorithms together and crack placements!",
     icon: Code,
-    members: 456,
     color: "text-dsa",
     gradient: "bg-gradient-to-br from-purple-500 to-pink-600",
   },
   {
-    id: "mental-wellness",
+    id: 3,
+    slug: "mental-wellness",
     name: "Mental Wellness",
-    description: "Your safe space for mental health. Join meditation sessions, share experiences, access wellness resources, and support each other.",
+    description: "Your safe space for mental health and support.",
     icon: Brain,
-    members: 189,
     color: "text-wellness",
     gradient: "bg-gradient-to-br from-green-500 to-emerald-600",
   },
   {
-    id: "startup",
+    id: 4,
+    slug: "startup",
     name: "Startup Hub",
-    description: "Connect with aspiring entrepreneurs, share startup ideas, find co-founders, get mentorship, and turn your ideas into reality!",
+    description: "Connect with entrepreneurs and build startups.",
     icon: Rocket,
-    members: 312,
     color: "text-startup",
     gradient: "bg-gradient-to-br from-orange-500 to-amber-600",
   },
   {
-    id: "gym",
+    id: 5,
+    slug: "gym",
     name: "Fitness & Gym",
-    description: "Find gym buddies, share workout routines, nutrition tips, track progress together, and stay motivated on your fitness journey!",
+    description: "Find workout partners and stay motivated.",
     icon: Dumbbell,
-    members: 278,
     color: "text-gym",
     gradient: "bg-gradient-to-br from-red-500 to-rose-600",
   },
 ];
 
+//////////////////////////////////////////////////////
+
 const Communities = () => {
   const [search, setSearch] = useState("");
+  const [members, setMembers] = useState(0);
+
+  const [membersMap, setMembersMap] = useState<Record<number, number>>({});
+
+  const [joinedCommunities, setJoinedCommunities] = useState<number[]>([]);
+
+  //////////////////////////////////////////////////////
+  // FETCH MEMBERS
+  //////////////////////////////////////////////////////
+
+  const fetchCommunities = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(
+        "https://connecto-2.onrender.com/api/communities/my-communities",
+        {
+          headers: { Authorization: token },
+        },
+      );
+
+      console.log("COMMUNITIES:", res.data);
+
+      const map: Record<number, number> = {};
+
+      const data = res.data?.communities || [];
+      data.forEach((c: any) => {
+        map[c.id] = c.members;
+      });
+
+      setMembersMap(map);
+    } catch (err) {
+      console.error("Fetch Communities Error:", err);
+    }
+  };
+  const fetchMembersCount = async () => {
+    try {
+      const res = await axios.get(
+        `https://connecto-2.onrender.com/api/communities/${id}/members-count`,
+      );
+
+      setMembers(res.data.membersCount);
+    } catch (err) {
+      console.error("Members count error:", err);
+    }
+  };
+  //////////////////////////////////////////////////////
+  // FETCH JOINED
+  //////////////////////////////////////////////////////
+
+  const fetchJoined = async () => {
+    try {
+      const res = await axios.get("/api/communities/my-communities");
+
+      console.log("JOINED:", res.data);
+
+      const ids = res.data?.communities?.map((c: any) => c.id) || [];
+
+      setJoinedCommunities(ids);
+    } catch (err) {
+      console.error("Fetch Joined Error:", err);
+    }
+  };
+
+  //////////////////////////////////////////////////////
+  // TOGGLE JOIN / LEAVE
+  //////////////////////////////////////////////////////
+
+  const handleToggleJoin = async (id: number) => {
+    try {
+      console.log("Clicked community:", id);
+
+      if (joinedCommunities.includes(id)) {
+        console.log("Leaving:", id);
+
+        await axios.delete(`/api/communities/${id}/leave`);
+
+        setJoinedCommunities((prev) => prev.filter((cid) => cid !== id));
+      } else {
+        console.log("Joining:", id);
+
+        await axios.post(`/api/communities/${id}/join`);
+
+        setJoinedCommunities((prev) => [...prev, id]);
+      }
+
+      fetchCommunities();
+    } catch (err: any) {
+      console.error("JOIN ERROR:", err);
+
+      alert(err.response?.data?.message || "Something went wrong");
+    }
+  };
+
+  //////////////////////////////////////////////////////
+
+  useEffect(() => {
+    fetchCommunities();
+    fetchJoined();
+    fetchMembersCount();
+  }, []);
+
+  //////////////////////////////////////////////////////
 
   const filteredCommunities = allCommunities.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.description.toLowerCase().includes(search.toLowerCase())
+      c.description.toLowerCase().includes(search.toLowerCase()),
   );
+
+  //////////////////////////////////////////////////////
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <main className="pt-24 pb-12">
         <div className="container mx-auto px-4">
-          {/* Header */}
-          <motion.div
-            className="text-center mb-12"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <h1 className="text-4xl md:text-5xl font-display font-bold mb-4">
-              Explore <span className="gradient-text">Communities</span>
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
-              Join micro-communities that match your interests. Connect with like-minded 
-              students, share experiences, and grow together.
-            </p>
+          {/* SEARCH */}
 
-            {/* Search */}
-            <div className="max-w-md mx-auto relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                placeholder="Search communities..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </motion.div>
+          <div className="mb-8 relative">
+            <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
 
-          {/* Communities Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCommunities.map((community, index) => (
-              <CommunityCard key={community.id} {...community} index={index} />
-            ))}
+            <Input
+              placeholder="Search communities..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
           </div>
 
-          {filteredCommunities.length === 0 && (
-            <motion.div
-              className="text-center py-12"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <p className="text-muted-foreground">No communities found matching "{search}"</p>
-            </motion.div>
-          )}
+          {/* CARDS */}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCommunities.map((community, index) => (
+              <CommunityCard
+                key={community.id}
+                {...community}
+                index={index}
+                members={members}
+                isJoined={joinedCommunities.includes(community.id)}
+                onToggleJoin={handleToggleJoin}
+              />
+            ))}
+          </div>
         </div>
       </main>
 

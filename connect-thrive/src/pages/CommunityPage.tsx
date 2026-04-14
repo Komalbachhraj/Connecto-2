@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -10,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
 import { Input } from "@/components/ui/input";
 import { socket } from "@/socket"; // Bas ye kafi hai
+import HackathonTab from "../components/hackathon/Hackathontab"
 
 import {
   Send,
@@ -30,6 +32,7 @@ import {
   Plane,
   Code,
   Rocket,
+  Link,
 } from "lucide-react";
 
 // --- Types ---
@@ -54,6 +57,7 @@ interface Community {
     title: string;
     icon: React.ElementType;
     description: string;
+     link?: string;
   }[];
 }
 
@@ -197,29 +201,10 @@ const communityData: Record<string, Community> = {
     members: 312,
 
     resources: [
-      {
-        title: "Startup Ideas",
-        icon: Lightbulb,
-        description: "Pitch and validate ideas",
-      },
-
-      {
-        title: "Find Co-founders",
-        icon: Users,
-        description: "Connect with potential partners",
-      },
-
-      {
-        title: "Funding Resources",
-        icon: Target,
-        description: "Grants and investor info",
-      },
-
-      {
-        title: "Success Stories",
-        icon: BookOpen,
-        description: "Learn from alumni startups",
-      },
+      { title: "Idea Hub", icon: Lightbulb, description: "Post ideas, find collaborators & get feedback", link: "/startup/ideas" },
+      { title: "Mentor Connect", icon: Users, description: "Book sessions with alumni mentors", link: "/startup/mentors" },
+      { title: "Funding & Opportunities", icon: Target, description: "Grants, competitions & incubation programs", link: "/startup/funding" },
+      { title: "Post Your Idea", icon: BookOpen, description: "Share your startup idea with the community", link: "/startup/post-idea" },
     ],
   },
 
@@ -269,9 +254,18 @@ const CommunityPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const idToSlug: Record<string, string> = {
+    "1": "travel",
+    "2": "dsa",
+    "3": "mental-wellness",
+    "4": "startup",
+    "5": "gym",
+  };
 
-  const community = communityData[id || "travel"] || communityData.travel;
-  const Icon = community.icon;
+  const slug = idToSlug[id || "1"];
+  const community = communityData[slug];
+  const community2=communityData[slug];
+  const Icon = community2.icon;
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPost, setNewPost] = useState("");
@@ -279,6 +273,9 @@ const CommunityPage = () => {
   const [activeCommentBox, setActiveCommentBox] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  // JOIN STATE
+const [isJoined, setIsJoined] = useState(false);
+const [membersCount, setMembersCount] = useState(0);
   // State for Chat
   const [chatMessages, setChatMessages] = useState<
     {
@@ -299,7 +296,105 @@ const CommunityPage = () => {
   // State hooks (Aapke code mein already hain, bas type update)
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
 
+  // CHECK IF USER JOINED THIS COMMUNITY
+
+const fetchJoinStatus = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await axios.get(
+      "http://localhost:5000/api/communities/my-communities",
+      {
+        headers: { Authorization: token },
+      }
+    );
+
+    console.log("JOINED DATA:", res.data);
+
+    const joinedIds = res.data?.communities || [];
+    if (joinedIds.includes(Number(id))) {
+      setIsJoined(true);
+    } else {
+      setIsJoined(false);
+    }
+
+  } catch (err) {
+    console.error("Join Status Error:", err);
+  }
+};
+const fetchMembersCount = async () => {
+  try {
+    const res = await axios.get(
+      `http://localhost:5000/api/communities/${id}/members-count`
+    );
+    console.log(res.data.membersCount)
+    setMembersCount(res.data.membersCount);
+
+  } catch (err) {
+    console.error("Members count error:", err);
+  }
+};
+const handleToggleJoin = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!id) return;
+
+    if (isJoined) {
+      // LEAVE
+
+      console.log("Leaving:", id);
+
+      await axios.delete(
+        `http://localhost:5000/api/communities/${id}/leave`,
+        {
+          headers: { Authorization: token },
+        }
+      );
+
+      setIsJoined(false);
+      setMembersCount((prev) => prev - 1);
+
+      toast({
+        title: "Left Community",
+      });
+
+    } else {
+      // JOIN
+
+      console.log("Joining:", id);
+ console.log(typeof id)
+      await axios.post(
+        `http://localhost:5000/api/communities/${id}/join`,
+        {},
+        {
+          headers: { Authorization: token },
+        }
+      );
+
+      setIsJoined(true);
+      setMembersCount((prev) => prev + 1);
+
+      toast({
+        title: "Joined Community 🎉",
+      });
+    }
+
+  } catch (err: any) {
+
+    console.error("JOIN ERROR:", err);
+
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description:
+        err.response?.data?.message ||
+        "Something went wrong",
+    });
+  }
+};
   // 1. Fetch Posts Logic
+
   const fetchPosts = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -308,11 +403,12 @@ const CommunityPage = () => {
         return;
       }
       const response = await axios.get(
-        `https://connecto-2.onrender.com/api/posts/${id}`,
+        `https://connecto-2.onrender.com/api/posts/${slug}`,
         {
           headers: { Authorization: token },
         },
       );
+      console.log(response.data,"Posts");
       setPosts(response.data);
     } catch (error) {
       if (error.response?.status === 401) navigate("/login");
@@ -326,6 +422,8 @@ const CommunityPage = () => {
 
   useEffect(() => {
     fetchPosts();
+    fetchJoinStatus();
+    fetchMembersCount();  
   }, [id]);
   useEffect(() => {
     if (scrollRef.current) {
@@ -338,9 +436,9 @@ const CommunityPage = () => {
   // useEffect ke andar socket listeners add karein
   // 1. Mark as Read Function
   const markAsRead = () => {
-    if (id && currentUser) {
+    if (slug && currentUser) {
       socket.emit("mark_messages_read", {
-        communityId: id,
+        communityId: slug,
         userId: currentUser, // Aapka naam, taaki server aapke alawa baaki sabke msgs read kar de
       });
     }
@@ -358,7 +456,7 @@ const CommunityPage = () => {
     return () => {
       socket.off("messages_marked_read");
     };
-  }, [id]);
+  }, [slug]);
   // 2. Create Post Logic
   const handleCreatePost = async () => {
     if (!newPost.trim()) return;
@@ -367,7 +465,7 @@ const CommunityPage = () => {
       const token = localStorage.getItem("token");
       await axios.post(
         "https://connecto-2.onrender.com/api/posts/create",
-        { community_id: id, content: newPost },
+        { community_id: slug, content: newPost },
         { headers: { Authorization: token } },
       );
       toast({ title: "Success!", description: "Post shared with community." });
@@ -453,11 +551,11 @@ const CommunityPage = () => {
   };
 
   useEffect(() => {
-    if (!id) return;
+    if (!slug) return;
 
     // 1. Join Room
-    socket.emit("join_community", id);
-    console.log("Joined room:", id);
+    socket.emit("join_community", slug);
+    console.log("Joined room:", slug);
 
     // 2. Clear old listener (Taki double messages na aayein)
     socket.off("receive_message");
@@ -475,7 +573,7 @@ const CommunityPage = () => {
     return () => {
       socket.off("receive_message");
     };
-  }, [id]); // Jab community id badlegi, naya room join hoga
+  }, [slug]); // Jab community id badlegi, naya room join hoga
  useEffect(() => {
    const loadMessages = async () => {
      try {
@@ -488,7 +586,7 @@ const CommunityPage = () => {
        }
 
        const res = await axios.get(
-         `https://connecto-2.onrender.com/api/messages/${id}`,
+         `https://connecto-2.onrender.com/api/messages/${slug}`,
          {
            // 2. Header add karo (Ye miss ho gaya tha)
            headers: { Authorization: token },
@@ -500,8 +598,8 @@ const CommunityPage = () => {
      }
    };
 
-   if (id) loadMessages();
- }, [id]);
+   if (slug) loadMessages();
+ }, [slug]);
   const ChatInput = ({ onSend }: { onSend: (msg: string) => void }) => {
     const [text, setText] = useState("");
 
@@ -529,9 +627,9 @@ const CommunityPage = () => {
   };
   // Send function same rahega, bas ek console add kiya hai debug ke liye
   const sendChatMessage = () => {
-    if (currentMsg.trim() && id) {
+    if (currentMsg.trim() && slug) {
       const msgData = {
-        communityId: id,
+        communityId: slug,
         sender_name: currentUser,
         message_text: currentMsg,
       };
@@ -576,7 +674,7 @@ const CommunityPage = () => {
                 </p>
                 <div className="flex items-center justify-center md:justify-start gap-4 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <Users className="w-4 h-4" /> {community.members} members
+                    <Users className="w-4 h-4" /> {membersCount} members
                   </span>
                   <span className="flex items-center gap-1 text-primary">
                     <div className="w-2 h-2 rounded-full bg-green-500" /> Active
@@ -584,7 +682,9 @@ const CommunityPage = () => {
                   </span>
                 </div>
               </div>
-              <Button className="btn-glow">Join Community</Button>
+              <Button onClick={handleToggleJoin} className="btn-glow">
+                {isJoined ? "Leave Community" : "Join Community"}
+              </Button>
             </div>
           </motion.div>
 
@@ -608,6 +708,11 @@ const CommunityPage = () => {
               <TabsTrigger value="resources">
                 <BookOpen className="w-4 h-4 mr-2" /> Resources
               </TabsTrigger>
+              {slug === "dsa" && (
+                <TabsTrigger value="hackathon">
+                  <Rocket className="w-4 h-4 mr-2" /> Hackathon Team
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* --- Posts Tab --- */}
@@ -741,14 +846,16 @@ const CommunityPage = () => {
             </TabsContent>
 
             {/* --- Resources Tab (Original UI) --- */}
+            {/* --- Resources Tab --- */}
             <TabsContent value="resources">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {community.resources.map((resource, index: number) => {
                   const ResIcon = resource.icon;
-                  return (
+
+                  // Card ka design ek variable mein rakh lete hain taaki repeat na ho
+                  const CardContent = (
                     <motion.div
-                      key={index}
-                      className="glass-card p-6 hover:border-primary/50 cursor-pointer"
+                      className="glass-card p-6 h-full hover:border-primary/50 cursor-pointer border border-white/10"
                       whileHover={{ scale: 1.02 }}
                     >
                       <div
@@ -763,6 +870,19 @@ const CommunityPage = () => {
                         {resource.description}
                       </p>
                     </motion.div>
+                  );
+
+                  // Agar link hai toh Link component se wrap karo, nahi toh normal div
+                  return resource.link ? (
+                    <button
+                      key={index}
+                      onClick={() => navigate(resource.link!)}
+                      className="text-left w-full h-full"
+                    >
+                      {CardContent}
+                    </button>
+                  ) : (
+                    <div key={index}>{CardContent}</div>
                   );
                 })}
               </div>
@@ -859,7 +979,7 @@ const CommunityPage = () => {
                       .replace("T", " ");
 
                     const msgData = {
-                      communityId: id,
+                      communityId: slug,
                       sender_name: currentUser,
                       message_text: msg,
                       created_at: mysqlDate, // <--- Ab ye '2026-02-28 13:20:26' bhejega
@@ -871,6 +991,11 @@ const CommunityPage = () => {
                 />
               </div>
             </TabsContent>
+            {slug === "dsa" && (
+              <TabsContent value="hackathon">
+                <HackathonTab />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </main>
