@@ -16,22 +16,21 @@ const hackathonRoutes = require("./routes/hackathonRoutes");
 
 const app = express();
 
-// CORS configuration
-const corsOptions = {
-  origin: [
-    "https://connecto-2.vercel.app",
-    "http://localhost:5173",
-    "http://localhost:8080",
-  ],
-  methods: ["GET", "POST", "PATCH", "DELETE", "PUT", "OPTIONS"],
-  credentials: true,
-};
+// 1. Middlewares
+// Yahan origin check kar lena, trailing slash "/" mat lagana
+app.use(
+  cors({
+    origin: [
+      "https://connecto-2.vercel.app",
+      "http://localhost:5173",
+      "http://localhost:8080",
+    ],
+    methods: ["GET", "POST","PATCH", "DELETE","PUT"],
+    credentials: true,
+  }),
+);
 
-// Apply CORS
-app.use(cors(corsOptions));
-
-// VERY IMPORTANT — handle preflight requests
-app.options("*", cors(corsOptions));
+app.use(express.json());
 
 // 2. Routes setup
 app.use("/api/auth", authRoutes);
