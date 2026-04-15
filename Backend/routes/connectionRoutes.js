@@ -74,5 +74,34 @@ router.post("/update", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Action failed" });
   }
 });
+router.delete("/disconnect/:buddyId", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const buddyId = Number(req.params.buddyId);
+
+    await db.query(
+      `
+        DELETE FROM connections
+        WHERE 
+          (sender_id = ? AND receiver_id = ?)
+          OR
+          (sender_id = ? AND receiver_id = ?)
+        `,
+      [userId, buddyId, buddyId, userId],
+    );
+
+    res.json({
+      success: true,
+      message: "Disconnected successfully",
+    });
+  } catch (error) {
+    console.error("Disconnect Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to disconnect",
+    });
+  }
+});
 
 module.exports = router;

@@ -88,6 +88,33 @@ router.get("/my-communities", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+router.get("/my-communities/details", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [rows] = await db.query(
+      `
+        SELECT 
+          c.id,
+          c.name,
+          c.slug
+        FROM community_members cm
+        JOIN communities c 
+          ON cm.community_id = c.id
+        WHERE cm.user_id = ?
+        `,
+      [userId],
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("FETCH COMMUNITY DETAILS ERROR:", err);
+
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+});
 router.get("/:id/members-count", async (req, res) => {
   try {
     const communityId = Number(req.params.id);

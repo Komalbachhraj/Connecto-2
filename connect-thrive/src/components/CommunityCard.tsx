@@ -54,26 +54,9 @@ const CommunityCard = ({
             </p>
 
             <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Users className="w-4 h-4" />
-                <span>{members}</span>
-              </div>
+              
 
-              {/* Join/Leave Button */}
-              <button
-                onClick={(e) => {
-                  e.preventDefault(); // Navigation rokne ke liye
-                  e.stopPropagation();
-                  onToggleJoin(id);
-                }}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  isJoined
-                    ? "bg-secondary text-secondary-foreground hover:bg-destructive hover:text-white"
-                    : `bg-primary text-primary-foreground hover:opacity-90`
-                }`}
-              >
-                {isJoined ? "Leave" : "Join"}
-              </button>
+
             </div>
           </div>
         </Link>

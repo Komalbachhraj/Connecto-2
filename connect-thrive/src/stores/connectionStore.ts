@@ -38,6 +38,7 @@ interface ConnectionState {
   fetchBuddies: () => Promise<void>;
   fetchConnections: () => Promise<void>;
   sendRequest: (buddyId: number) => Promise<boolean>;
+  disconnect: (buddyId: number) => Promise<boolean>;
   respondToRequest: (
     buddyId: number,
     action: "accepted" | "rejected",
@@ -133,6 +134,29 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       }
       return false;
     } catch (err) {
+      return false;
+    }
+  },
+  disconnect: async (buddyId: number) => {
+    try {
+      const res = await fetch(
+        `https://connecto-2.onrender.com/api/connections/disconnect/${buddyId}`,
+        {
+          method: "DELETE",
+          headers: getHeaders(),
+        },
+      );
+
+      if (res.ok) {
+        // Refresh connections after disconnect
+        await get().fetchConnections();
+        await get().fetchBuddies();
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.error("Disconnect error:", err);
       return false;
     }
   },

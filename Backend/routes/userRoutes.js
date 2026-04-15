@@ -135,4 +135,63 @@ router.get("/all-buddies", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Failed to fetch buddies" });
   }
 });
+router.get("/profile/:id", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // 1️⃣ Get user info
+    const [users] = await db.query(
+      `SELECT 
+        id,
+        username,
+        email,
+        hometown,
+        bio,
+        course,
+        year,
+        interests
+       FROM users
+       WHERE id = ?`,
+      [userId],
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const user = users[0];
+
+    // 2️⃣ Get communities joined
+    const [communities] = await db.query(
+      `
+      SELECT 
+        c.id,
+        c.name,
+        c.slug
+      FROM user_communities uc
+      JOIN communities c
+        ON uc.community_id = c.id
+      WHERE uc.user_id = ?
+      `,
+      [userId],
+    );
+
+    res.json({
+      ...user,
+      communities,
+      interests:
+        typeof user.interests === "string"
+          ? JSON.parse(user.interests)
+          : user.interests || [],
+    });
+  } catch (err) {
+    console.error("Profile fetch error:", err);
+
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+});
 module.exports = router;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -157,7 +158,10 @@ function Profile() {
 
     // 2. Communities
     axios
-      .get(`${API}/communities`, { headers })
+      .get(
+        `https://connecto-2.onrender.com/api/communities/my-communities/details`,
+        { headers },
+      )
       .then((res) => setCommunities(res.data))
       .catch((err) => console.warn("Communities fetch:", err))
       .finally(() => setLoadingCommunities(false));

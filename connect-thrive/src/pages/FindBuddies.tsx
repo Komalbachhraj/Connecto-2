@@ -28,6 +28,7 @@ import {
 import { useConnectionStore, type Buddy } from "@/stores/connectionStore";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 
 const cities = [
   "All Cities",
@@ -43,23 +44,27 @@ const FindBuddies = () => {
   const [selectedCity, setSelectedCity] = useState("All Cities");
   
   // Zustand Store se data aur functions nikalna
-  const { 
-    buddies, 
-    fetchBuddies, 
-    fetchConnections, 
-    getStatus, 
-    sendRequest, 
-    getIncomingRequests 
+  const {
+    buddies,
+    fetchBuddies,
+    fetchConnections,
+    getStatus,
+    disconnect,
+    sendRequest,
+    getIncomingRequests,
   } = useConnectionStore();
   
   const { toast } = useToast();
   
   const myId = Number(localStorage.getItem("userId")); 
-
+const navigate = useNavigate();
 // Ab filter logic khud-ba-khud tumhe results se gayab kar dega
  // Bhai yahan apni logged-in user ID pass karna (auth se le sakte ho)
 
   // Page load hote hi DB se data fetch karo
+  const handleMessage = (buddyId: number) => {
+    navigate(`/messages/${buddyId}`);
+  };
   useEffect(() => {
     fetchBuddies();
     fetchConnections(myId);
@@ -90,7 +95,22 @@ const FindBuddies = () => {
       default: return Train;
     }
   };
+  const handleDisconnect = async (buddyId: number, buddyName: string) => {
+    const success = await disconnect(buddyId);
 
+    if (success) {
+      toast({
+        title: "Disconnected ❌",
+        description: `You disconnected from ${buddyName}`,
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to disconnect",
+      });
+    }
+  };
   const handleConnectClick = async (buddyId: number, buddyName: string) => {
     const status = getStatus(buddyId);
     
@@ -225,43 +245,99 @@ const FindBuddies = () => {
                     return (
                       <motion.div
                         key={buddy.id}
-                        className="glass-card p-6 hover:border-primary/50 transition-all"
+                        className="glass-card p-6 hover:border-primary/50 hover:shadow-lg transition-all cursor-pointer"
                         whileHover={{ scale: 1.02 }}
+                        onClick={() => navigate(`/profile/${buddy.id}`)}
                       >
                         <div className="flex items-start gap-4">
                           <div className="relative">
                             <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-xl font-medium text-primary-foreground">
                               {buddy.avatar || buddy.name[0]}
                             </div>
-                            {buddy.online && <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />}
+                            {buddy.online && (
+                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
+                            )}
                           </div>
                           <div className="flex-1">
                             <h3 className="font-semibold">{buddy.name}</h3>
-                            <p className="text-sm text-muted-foreground">{buddy.course} • {buddy.year}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {buddy.course} • {buddy.year}
+                            </p>
                             <div className="flex items-center gap-2 mt-2">
                               <TravelIcon className="w-4 h-4 text-primary" />
-                              <span className="text-xs text-muted-foreground capitalize">Prefers {buddy.travelMode}</span>
+                              <span className="text-xs text-muted-foreground capitalize">
+                                Prefers {buddy.travelMode}
+                              </span>
                             </div>
                           </div>
                         </div>
 
                         <div className="flex flex-wrap gap-2 mt-4">
-                          {(Array.isArray(buddy.interests) ? buddy.interests : []).map((interest) => (
-                            <span key={interest} className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
+                          {(Array.isArray(buddy.interests)
+                            ? buddy.interests
+                            : []
+                          ).map((interest) => (
+                            <span
+                              key={interest}
+                              className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary"
+                            >
                               {interest}
                             </span>
                           ))}
                         </div>
 
-                        <div className="mt-4 pt-4 border-t border-border/50">
-                          <Button
-                            variant={btn.variant}
-                            className={`w-full ${btn.className}`}
-                            onClick={() => handleConnectClick(buddy.id, buddy.name)}
-                          >
-                            <btn.icon className="w-4 h-4 mr-2" />
-                            {btn.label}
-                          </Button>
+                        <div className="mt-4 pt-4 border-t border-border/50 flex gap-2">
+                          {getStatus(buddy.id) === "connected" ? (
+                            <>
+                              {/* Connected */}
+                              <Button
+                                variant="outline"
+                                className="border-green-500/50 text-green-500"
+                                disabled
+                              >
+                                Connected
+                              </Button>
+
+                              {/* Message */}
+                              <Button
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+
+                                  handleMessage(buddy.id)}}
+                              >
+                                Message
+                              </Button>
+
+                              {/* Disconnect */}
+                              <Button
+                                variant="destructive"
+                                onClick={(e) =>{
+                                  e.stopPropagation();
+                                  handleDisconnect(buddy.id, buddy.name)
+                                }
+                                  
+                                }
+                              >
+                                Disconnect
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              variant={btn.variant}
+                              className={`w-full ${btn.className}`}
+                              onClick={(e) =>{
+                                e.stopPropagation();
+
+                                handleConnectClick(buddy.id, buddy.name)
+                              }
+                                
+                              }
+                            >
+                              <btn.icon className="w-4 h-4 mr-2" />
+                              {btn.label}
+                            </Button>
+                          )}
                         </div>
                       </motion.div>
                     );

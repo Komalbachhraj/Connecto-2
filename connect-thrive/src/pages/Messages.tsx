@@ -9,6 +9,8 @@ import { Search, Send, Loader2 } from "lucide-react";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useChatStore } from "@/stores/chatStore";
 import { socket } from "@/socket";
+import { useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 const Messages = () => {
   const {
@@ -32,12 +34,24 @@ const Messages = () => {
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [newMessage, setNewMessage] = useState("");
-
+  const navigate = useNavigate();
+const { userId } = useParams();
   // ✅ FIX: Always Number
   const userString = localStorage.getItem("user");
+  useEffect(() => {
+    if (userId && buddies.length > 0) {
+      const buddy = buddies.find((b) => b.id === Number(userId));
+
+      if (buddy) {
+        setSelectedChatId(buddy.id);
+        setView("chats");
+      }
+    }
+  }, [userId, buddies]);
 
   const currentUserId = userString ? Number(JSON.parse(userString).id) : null;
 // console.log(currentUserId);
+
   /* ================= FETCH CONNECTIONS ================= */
 
   useEffect(() => {

@@ -23,6 +23,7 @@ import MentorConnect from "./pages/startup/MentorConnect";
 import MentorProfile from "./pages/startup/MentorProfile";
 import Funding from "./pages/startup/Funding";
 import IdeaHub from "./pages/startup/IdeaHub";
+import UserProfile from "./pages/UserProfile";
 
 
 const queryClient = new QueryClient();
@@ -46,9 +47,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter future={{v7_startTransition:true,
-        v7_relativeSplatPath:true,
-      }}>
+      <BrowserRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <Routes>
           {/* Protected Routes: Sirf login ke baad dikhenge */}
           <Route
@@ -67,6 +68,10 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+ <Route
+  path="/profile/:id"
+  element={<UserProfile />}
+/>
           <Route
             path="/messages"
             element={
@@ -75,6 +80,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+          <Route path="/messages/:userId" element={<Messages />} />
           <Route
             path="/communities"
             element={
@@ -114,7 +120,14 @@ const App = () => (
           <Route path="/startup/ideas" element={<IdeaHub />} />
           <Route path="/startup/mentor/:id" element={<MentorProfile />} />
           <Route path="/startup/funding" element={<Funding />} />
-          <Route path="/onboarding" element={<ProtectedRoute><OnboardingFlow /></ProtectedRoute>} />
+          <Route
+            path="/onboarding"
+            element={
+              <ProtectedRoute>
+                <OnboardingFlow />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Public Routes: Har koi dekh sakta hai */}
           <Route path="/login" element={<Login />} />
